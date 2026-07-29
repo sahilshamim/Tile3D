@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tile Room Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#eee8dc;
+    --panel:#fbf9f4;
+    --ink:#241f18;
+    --stone:#8a8172;
+    --line:#e2dac8;
+    --clay:#8c4a2a;
+    --clay-dark:#6f3a20;
+    --gold:#b6893f;
+    --gold-light:#e2c98a;
+    --grout-default:#c9c1ac;
+    --tag:#a1793f;
+    --radius:12px;
+    --stage-bg-1:#232019;
+    --stage-bg-2:#14120e;
+    --stage-ink:#f3ede1;
+    --stage-sub:#a89d89;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{display:flex; min-height:100vh;}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:376px;
+    flex-shrink:0;
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    padding:32px 26px 36px;
+    overflow-y:auto;
+    max-height:100vh;
+    box-shadow:2px 0 24px rgba(20,15,8,0.05);
+    position:relative;
+    z-index:2;
+  }
+  .brand-row{display:flex; align-items:center; gap:10px; margin-bottom:4px;}
+  .brand-mark{
+    width:30px;height:30px;
+    border-radius:8px;
+    background:linear-gradient(145deg, var(--gold-light), var(--gold) 55%, var(--clay-dark));
+    box-shadow:inset 0 1px 1px rgba(255,255,255,0.5), 0 2px 6px rgba(140,74,42,0.35);
+    flex-shrink:0;
+  }
+  .brand{font-family:'Fraunces',serif; font-weight:600; font-size:21px; letter-spacing:-0.01em; margin:0;}
+  .brand-sub{
+    font-size:12.5px; color:var(--stone); margin:14px 0 28px; line-height:1.6;
+    padding-bottom:22px; border-bottom:1px solid var(--line);
+  }
+  .section{margin-bottom:26px; padding-bottom:22px; border-bottom:1px solid var(--line);}
+  .section:last-of-type{border-bottom:none;}
+  .section-label{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.1em;
+    color:var(--gold); font-weight:700; margin:0 0 12px;
+  }
+  .section-label .muted{color:var(--stone); text-transform:none; letter-spacing:0; font-weight:500;}
+
+  /* wall tabs */
+  .wall-tabs{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .wall-tab{
+    padding:9px 8px;
+    border-radius:9px;
+    border:1px solid var(--line);
+    background:#fff;
+    cursor:pointer;
+    text-align:center;
+    transition:all .15s ease;
+  }
+  .wall-tab .wt-name{font-weight:700; font-size:12.5px; display:block;}
+  .wall-tab .wt-tag{font-size:10px; color:var(--stone); text-transform:uppercase; letter-spacing:.06em; display:block; margin-top:1px;}
+  .wall-tab:hover{border-color:var(--gold);}
+  .wall-tab.active{
+    background:linear-gradient(135deg, var(--gold-light), var(--gold));
+    border-color:var(--gold);
+    box-shadow:0 3px 8px rgba(182,137,63,0.35);
+  }
+  .wall-tab.active .wt-name{color:#3a2a12;}
+  .wall-tab.active .wt-tag{color:#5a4322;}
+  .tab-hint{font-size:11px; color:var(--stone); margin-top:12px; line-height:1.5;}
+
+  .stepper-row{display:flex; gap:14px;}
+  .stepper{
+    flex:1; display:flex; align-items:center; justify-content:space-between;
+    background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:8px 10px;
+  }
+  .stepper .val{font-family:'Fraunces',serif; font-size:19px; font-weight:600; min-width:24px; text-align:center;}
+  .stepper .lbl{font-size:10.5px; color:var(--stone); text-transform:uppercase; letter-spacing:.06em;}
+  .stepper button{
+    width:26px;height:26px; border-radius:7px; border:1px solid var(--line);
+    background:var(--bg); color:var(--ink); font-size:15px; cursor:pointer; line-height:1;
+  }
+  .stepper button:hover{background:var(--clay); color:#fff; border-color:var(--clay);}
+
+  .grout-row{display:flex; align-items:center; gap:12px; margin-top:2px;}
+  input[type=range]{flex:1; accent-color: var(--clay);}
+  .swatches{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+  .swatch{width:22px;height:22px;border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer;}
+  .swatch.active{box-shadow:0 0 0 2px var(--gold);}
+  .swatches-lg .swatch{width:28px; height:28px;}
+  .custom-color-row{display:flex; align-items:center; gap:10px; margin-top:14px;}
+  .custom-color-swatch{
+    width:28px;height:28px; border-radius:50%; overflow:hidden;
+    border:2px solid #fff; box-shadow:0 0 0 1px var(--line); display:block; cursor:pointer;
+  }
+  .custom-color-swatch input[type=color]{width:44px;height:44px; margin:-8px; border:none; cursor:pointer; padding:0; background:none;}
+  .custom-color-label{font-size:12px; color:var(--stone);}
+
+  .ratio-options{display:flex; gap:8px; flex-wrap:wrap;}
+  .ratio-btn{
+    flex:1; min-width:64px; padding:9px 6px; border-radius:9px; border:1px solid var(--line);
+    background:#fff; color:var(--ink); font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+    cursor:pointer; text-align:center; transition:all .15s ease;
+  }
+  .ratio-btn:hover{border-color:var(--gold); color:var(--clay-dark);}
+  .ratio-btn.active{
+    background:linear-gradient(135deg, var(--gold-light), var(--gold));
+    border-color:var(--gold); color:#3a2a12; box-shadow:0 3px 8px rgba(182,137,63,0.35);
+  }
+  .ratio-hint{font-size:11px; color:var(--stone); margin-top:10px; line-height:1.5;}
+
+  .row-list{display:flex; flex-direction:column; gap:10px;}
+  .row-item{display:flex; align-items:center; gap:12px; background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:8px;}
+  .row-tag{
+    font-family:'Fraunces',serif; font-weight:600; font-size:12px; color:#fff; background:var(--tag);
+    width:26px;height:26px; border-radius:50%; display:flex;align-items:center;justify-content:center; flex-shrink:0;
+  }
+  .row-thumb{
+    width:44px;height:44px; border-radius:6px;
+    background:repeating-linear-gradient(45deg,#e8e2d3,#e8e2d3 6px,#f4f0e6 6px,#f4f0e6 12px);
+    background-size:cover; background-position:center; flex-shrink:0; border:1px solid var(--line); cursor:pointer;
+  }
+  .row-info{flex:1; min-width:0;}
+  .row-name{font-size:12.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .row-hint{font-size:11px; color:var(--stone);}
+  .row-actions{display:flex; gap:6px; flex-shrink:0;}
+  .icon-btn{
+    width:26px;height:26px; border-radius:6px; border:1px solid var(--line); background:var(--bg);
+    cursor:pointer; font-size:13px; display:flex;align-items:center;justify-content:center; color:var(--stone);
+  }
+  .icon-btn:hover{background:#f1eadc;color:var(--ink);}
+
+  .primary-btn{
+    width:100%; padding:14px 14px; border-radius:var(--radius); border:none;
+    background:linear-gradient(135deg, var(--clay), var(--clay-dark)); color:#fbf3e6;
+    font-family:'Inter',sans-serif; font-weight:700; font-size:12.5px; text-transform:uppercase; letter-spacing:.08em;
+    cursor:pointer; box-shadow:0 6px 16px -4px rgba(111,58,32,0.55), inset 0 1px 0 rgba(255,255,255,0.12);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .primary-btn:hover{transform:translateY(-1px); box-shadow:0 9px 20px -4px rgba(111,58,32,0.6), inset 0 1px 0 rgba(255,255,255,0.14);}
+  .primary-btn:disabled{opacity:.7; cursor:default; transform:none;}
+  .ghost-btn{
+    width:100%; padding:10px 14px; border-radius:var(--radius); border:1px solid var(--line); background:transparent;
+    color:var(--ink); font-family:'Inter',sans-serif; font-weight:500; font-size:13px; cursor:pointer; margin-top:8px;
+    transition:all .15s ease;
+  }
+  .ghost-btn:hover{border-color:var(--gold); color:var(--clay-dark); background:#fbf6ea;}
+
+  /* ---------- Stage / Room ---------- */
+  .stage{
+    flex:1; padding:40px 48px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    overflow:auto;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% 15%, rgba(182,137,63,0.10), transparent 60%),
+      radial-gradient(ellipse 1200px 800px at 50% 0%, var(--stage-bg-1), var(--stage-bg-2) 75%);
+    position:relative;
+  }
+  .stage-header{width:100%; max-width:1100px; margin-bottom:22px; position:relative; z-index:1;}
+  .stage-title{font-family:'Fraunces',serif; font-size:27px; font-weight:600; margin:0; color:var(--stage-ink);}
+  .stage-title span{color:var(--gold-light);}
+  .stage-meta{font-size:12.5px; color:var(--stage-sub); margin-top:4px;}
+
+  #captureArea{
+    width:fit-content; max-width:none; background:#efe8da; border-radius:16px;
+    padding:48px; position:relative; z-index:1;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.55);
+  }
+  #captureArea::before{
+    content:''; position:absolute; inset:0; border-radius:16px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.20), rgba(0,0,0,0.05) 75%, rgba(0,0,0,0.14));
+    pointer-events:none;
+  }
+
+  .room-grid{
+    display:grid;
+    grid-template-columns:auto auto auto;
+    grid-template-rows:auto auto auto;
+    gap:36px;
+    position:relative;
+    z-index:1;
+  }
+  .pos-back{grid-column:2; grid-row:1; justify-self:center;}
+  .pos-left{grid-column:1; grid-row:2; align-self:center;}
+  .pos-floor{grid-column:2; grid-row:2; justify-self:center; align-self:center;}
+  .pos-right{grid-column:3; grid-row:2; align-self:center;}
+  .pos-front{grid-column:2; grid-row:3; justify-self:center;}
+
+  .floor-slot{
+    width:96px; height:96px; border:1px dashed rgba(90,67,34,0.35); border-radius:10px;
+    display:flex; align-items:center; justify-content:center; color:rgba(90,67,34,0.55);
+    font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; font-weight:700; text-align:center;
+  }
+
+  .wall-elevation{display:flex; flex-direction:column; align-items:center;}
+  .wall-frame{
+    display:grid;
+    box-shadow:0 22px 38px -16px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.22);
+    border-radius:4px; overflow:hidden; background:#fff;
+  }
+  .cell{
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+    background-color:#f4f0e6; position:relative;
+  }
+  .cell.empty{
+    background-image:repeating-linear-gradient(45deg,#e9e3d5,#e9e3d5 7px,#f6f2e8 7px,#f6f2e8 14px);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .cell.empty::after{content:"+"; font-size:18px; color:#c3b89e; font-family:'Inter',sans-serif; font-weight:300;}
+  .cell.empty:hover::after{color:var(--gold);}
+  .cell.blank-wall{cursor:default;}
+  .cell.highlighted{box-shadow: inset 0 0 0 2px rgba(255,255,255,0.55), inset 0 0 10px rgba(0,0,0,0.15); cursor:pointer;}
+
+  .trim-line{height:3px; width:100%; background:linear-gradient(90deg, var(--gold), var(--gold-light) 45%, var(--gold) 100%); box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+  .skirting{height:22px; width:100%; background:linear-gradient(180deg,#8a6a45,#5f4429); border-radius:0 0 4px 4px;}
+  .wall-plaque{
+    margin-top:8px; font-size:10.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--stage-sub);
+  }
+
+  .footnote{max-width:1100px; width:100%; font-size:11.5px; color:var(--stage-sub); margin-top:20px; line-height:1.6; position:relative; z-index:1;}
+
+  .view-toggle{display:flex; gap:8px; margin-top:14px;}
+  .view-btn{
+    padding:9px 16px; border-radius:9px; border:1px solid rgba(226,201,138,0.3);
+    background:rgba(255,255,255,0.04); color:var(--stage-sub);
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
+    transition:all .15s ease;
+  }
+  .view-btn:hover{border-color:var(--gold-light); color:var(--stage-ink);}
+  .view-btn.active{
+    background:linear-gradient(135deg, var(--gold-light), var(--gold));
+    border-color:var(--gold); color:#3a2a12;
+  }
+
+  #threeWrap{
+    display:none;
+    width:100%;
+    max-width:1100px;
+    height:min(70vh, 620px);
+    border-radius:16px;
+    overflow:hidden;
+    position:relative;
+    z-index:1;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.55);
+    background:#0e0d0a;
+  }
+  #threeCanvas{width:100%; height:100%; display:block; cursor:grab; touch-action:none;}
+  #threeCanvas:active{cursor:grabbing;}
+  .three-hint{
+    position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+    background:rgba(20,17,12,0.65); color:var(--stage-sub);
+    font-size:11px; padding:6px 14px; border-radius:20px;
+    border:1px solid rgba(226,201,138,0.2); pointer-events:none;
+  }
+
+  @media (max-width:1100px){
+    .app{flex-direction:column;}
+    .sidebar{width:100%; max-height:none; border-right:none; border-bottom:1px solid var(--line);}
+    .stage{padding:24px 18px;}
+    #captureArea{padding:24px;}
+    .room-grid{gap:20px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand-row">
+      <div class="brand-mark"></div>
+      <p class="brand">Tile Room Planner</p>
+    </div>
+    <p class="brand-sub">Build up to four walls, mix tiles row by row, and see the whole room together — great for walking a customer through a full layout on the spot.</p>
+
+    <div class="section">
+      <p class="section-label">Room walls</p>
+      <div class="wall-tabs" id="wallTabs"></div>
+      <p class="tab-hint">Pick a wall to edit its rows, columns and tiles below. All four walls share the same tile shape, grout and wall colour.</p>
+      <button class="ghost-btn" onclick="copyActiveWallToAll()">Copy this wall to all other walls</button>
+    </div>
+
+    <div class="section">
+      <p class="section-label">Grid size <span class="muted" id="gridSizeWallLabel"></span></p>
+      <div class="stepper-row">
+        <div class="stepper">
+          <button onclick="changeRows(-1)">–</button>
+          <div><div class="val" id="rowsVal">4</div><div class="lbl">Rows</div></div>
+          <button onclick="changeRows(1)">+</button>
+        </div>
+        <div class="stepper">
+          <button onclick="changeCols(-1)">–</button>
+          <div><div class="val" id="colsVal">6</div><div class="lbl">Columns</div></div>
+          <button onclick="changeCols(1)">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-label">Wall colour</p>
+      <div class="swatches swatches-lg" id="wallSwatches"></div>
+      <div class="custom-color-row">
+        <label class="custom-color-swatch">
+          <input type="color" id="wallColorPicker" value="#efe8da" oninput="setWallColor(this.value)">
+        </label>
+        <span class="custom-color-label">Custom colour</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-label">Floor</p>
+      <div class="row-list" id="floorRow"></div>
+      <p class="ratio-hint" id="floorGridInfo">Only used in the 3D room view — the floor automatically fills the room footprint based on your wall sizes and the floor tile shape below.</p>
+
+      <p class="section-label" style="margin-top:16px;">Floor tile shape</p>
+      <div class="ratio-options" id="floorRatioOptions"></div>
+
+      <p class="section-label" style="margin-top:16px;">Floor grout</p>
+      <div class="grout-row">
+        <input type="range" id="floorGroutSlider" min="0" max="16" value="4" oninput="setFloorGroutWidth(this.value)">
+        <span id="floorGroutValLabel" style="font-size:12px;color:var(--stone);width:34px;">4px</span>
+      </div>
+      <div class="swatches" id="floorGroutSwatches"></div>
+      <div class="custom-color-row">
+        <label class="custom-color-swatch">
+          <input type="color" id="floorGroutColorPicker" value="#c9c1ac" oninput="setFloorGroutColor(this.value)">
+        </label>
+        <span class="custom-color-label">Custom colour</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-label">Tile shape</p>
+      <div class="ratio-options" id="ratioOptions"></div>
+
+      <p class="section-label" style="margin-top:18px;">Photo fit</p>
+      <div class="ratio-options" id="fitOptions"></div>
+      <p class="ratio-hint" id="fitHint"></p>
+    </div>
+
+    <div class="section">
+      <p class="section-label">Wall grout</p>
+      <div class="grout-row">
+        <input type="range" id="groutSlider" min="0" max="16" value="4" oninput="setGroutWidth(this.value)">
+        <span id="groutValLabel" style="font-size:12px;color:var(--stone);width:34px;">4px</span>
+      </div>
+      <div class="swatches" id="groutSwatches"></div>
+      <div class="custom-color-row">
+        <label class="custom-color-swatch">
+          <input type="color" id="groutColorPicker" value="#c9c1ac" oninput="setGroutColor(this.value)">
+        </label>
+        <span class="custom-color-label">Custom colour</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-label">Row tiles <span class="muted" id="rowTilesWallLabel"></span></p>
+      <div class="row-list" id="rowList"></div>
+      <button class="ghost-btn" onclick="applyFirstToAll()">Apply Row 1 tile to all rows on this wall</button>
+    </div>
+
+    <div class="section">
+      <p class="section-label">Customize &amp; highlighter</p>
+      <p class="ratio-hint">Click any tile square directly in the room preview to customize just that one square with its own photo — no need to change the whole row.</p>
+      <button class="ratio-btn" id="highlighterToggle" style="width:100%; margin-top:12px;" onclick="toggleHighlighterMode()">Highlighter mode: Off</button>
+      <div class="swatches swatches-lg" id="highlighterSwatches" style="margin-top:12px;"></div>
+      <div class="custom-color-row">
+        <label class="custom-color-swatch">
+          <input type="color" id="highlighterColorPicker" value="#b6893f" oninput="setHighlighterColor(this.value)">
+        </label>
+        <span class="custom-color-label">Custom colour</span>
+      </div>
+      <p class="ratio-hint">1) Turn on Highlighter mode and click adjacent squares to mark a run — up/down or left/right, any length — in your chosen colour. Marked squares that touch each other merge into one single space. 2) Turn Highlighter mode back off, then click that merged space once to upload a photo — it stretches across the whole marked area, like one large feature tile. Click a marked square again (with the same colour selected) to un-mark it.</p>
+      <button class="ghost-btn" onclick="clearWallOverrides(activeWallIndex)">Clear custom edits on this wall</button>
+    </div>
+
+    <div class="section" style="border-bottom:none;">
+      <button class="primary-btn" id="downloadBtn" onclick="downloadImage()">Save room preview as image</button>
+    </div>
+  </div>
+
+  <!-- STAGE -->
+  <div class="stage">
+    <div class="stage-header">
+      <h1 class="stage-title">Room <span>preview</span></h1>
+      <div class="stage-meta" id="metaLine"></div>
+      <div class="view-toggle">
+        <button class="view-btn active" id="viewBtn2d" onclick="setViewMode('2d')">2D Elevations</button>
+        <button class="view-btn" id="viewBtn3d" onclick="setViewMode('3d')">3D Room (interactive)</button>
+      </div>
+    </div>
+
+    <div id="captureArea">
+      <div class="room-grid">
+        <div class="wall-elevation pos-back" id="slotBack"></div>
+        <div class="wall-elevation pos-left" id="slotLeft"></div>
+        <div class="pos-floor"><div class="floor-slot" id="floorSlotPreview">Floor</div></div>
+        <div class="wall-elevation pos-right" id="slotRight"></div>
+        <div class="wall-elevation pos-front" id="slotFront"></div>
+      </div>
+    </div>
+
+    <div id="threeWrap">
+      <canvas id="threeCanvas"></canvas>
+      <div class="three-hint">Drag to rotate · scroll or pinch to zoom</div>
+    </div>
+
+    <p class="footnote" id="footnoteText">Laid out as an unfolded room — Back wall on top, Left and Right on the sides, Front wall on the bottom — so all four walls compare directly with no perspective distortion. If a wall has fewer rows than the tallest wall, the gap at the top is filled with your chosen wall colour, just like tiling only partway up a real wall.</p>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" style="display:none">
+
+<script>
+/* ---------- State ---------- */
+const WALL_DEFS = [
+  {key:'front', name:'Wall 1', tag:'Front', slot:'slotFront', pos:'front'},
+  {key:'right', name:'Wall 2', tag:'Right', slot:'slotRight', pos:'right'},
+  {key:'back',  name:'Wall 3', tag:'Back',  slot:'slotBack',  pos:'back'},
+  {key:'left',  name:'Wall 4', tag:'Left',  slot:'slotLeft',  pos:'left'},
+];
+
+let walls = [
+  { numRows:4, numCols:6, rowTiles:new Array(4).fill(null), cellOverrides:{} }, // front
+  { numRows:4, numCols:4, rowTiles:new Array(4).fill(null), cellOverrides:{} }, // right
+  { numRows:4, numCols:6, rowTiles:new Array(4).fill(null), cellOverrides:{} }, // back
+  { numRows:4, numCols:4, rowTiles:new Array(4).fill(null), cellOverrides:{} }, // left
+];
+let activeWallIndex = 0;
+let activeUpload = null; // {type:'wall', wallIndex, rowIndex} | {type:'cell', wallIndex, rowIndex, colIndex} | {type:'floor'}
+let floor = { tile:null };
+let floorRatio = 1;
+let viewMode = '2d';
+let highlighterMode = false;
+let highlighterColor = '#b6893f';
+const highlighterPalette = ['#b6893f', '#2a241c', '#2f5d55', '#7a2e22', '#24344a', '#c98a7a', '#ffffff', '#8c8272'];
+
+let groutWidth = 4;
+let groutColor = '#c9c1ac';
+let floorGroutWidth = 4;
+let floorGroutColor = '#c9c1ac';
+let tileRatio = 1;
+let fitMode = 'contain';
+let wallColor = '#efe8da';
+
+const groutPalette = ['#c9c1ac', '#efe9db', '#3a352b', '#8a8272', '#d6cdb8'];
+const wallPalette = ['#efe8da', '#e3ddcf', '#c9d1c3', '#d9c9b8', '#b7c3cf', '#e4d2c6', '#3a352f', '#ffffff'];
+const ratioOptions = [
+  {label:'3 : 1', value:3},
+  {label:'2 : 1', value:2},
+  {label:'1.5 : 1', value:1.5},
+  {label:'1 : 1', value:1},
+];
+const fitOptions = [
+  {label:'Fit (keep shape)', value:'contain', hint:"Shows the full photo with no cropping — empty space is filled with a neutral background if the photo's own proportions don't match the tile ratio."},
+  {label:'Stretch to fill', value:'stretch', hint:'Fills the entire tile shape edge to edge with no gaps — the photo is stretched or squeezed to match the ratio exactly, so it may look slightly distorted.'},
+];
+const BASE_CELL = 60; // px — the "breadth" side of one tile at 1x zoom
+
+function init(){
+  renderWallTabs();
+  renderGroutSwatches();
+  renderFloorGroutSwatches();
+  renderWallSwatches();
+  renderRatioOptions();
+  renderFitOptions();
+  applyWallColorBg();
+  renderFloorControls();
+  renderFloorRatioOptions();
+  renderHighlighterSwatches();
+  setup3D();
+  renderAll();
+}
+
+/* ---------- Sidebar renderers ---------- */
+function renderWallTabs(){
+  const wrap = document.getElementById('wallTabs');
+  wrap.innerHTML = '';
+  WALL_DEFS.forEach((def,i)=>{
+    const btn = document.createElement('div');
+    btn.className = 'wall-tab' + (i===activeWallIndex ? ' active':'');
+    btn.innerHTML = `<span class="wt-name">${def.name}</span><span class="wt-tag">${def.tag}</span>`;
+    btn.onclick = ()=>{ activeWallIndex = i; renderWallTabs(); renderSidebarWallControls(); };
+    wrap.appendChild(btn);
+  });
+}
+
+function computeWallRenderPlan(wallIndex){
+  const w = walls[wallIndex];
+  const maxRows = getMaxRows();
+  const padTop = maxRows - w.numRows;
+  const overrides = w.cellOverrides || {};
+
+  // Merge groups only form from cells explicitly marked with the Highlighter tool
+  const highlightedKeys = Object.keys(overrides).filter(k => overrides[k] && overrides[k].highlighted);
+  const keySet = new Set(highlightedKeys);
+  const visited = new Set();
+  const groupOf = {};
+
+  highlightedKeys.forEach(k=>{
+    if(visited.has(k)) return;
+    const queue = [k]; visited.add(k);
+    const cells = [k];
+    while(queue.length){
+      const cur = queue.pop();
+      const [r,c] = cur.split('-').map(Number);
+      [`${r-1}-${c}`, `${r+1}-${c}`, `${r}-${c-1}`, `${r}-${c+1}`].forEach(n=>{
+        if(keySet.has(n) && !visited.has(n)){ visited.add(n); queue.push(n); cells.push(n); }
+      });
+    }
+    let minR=Infinity, maxR=-Infinity, minC=Infinity, maxC=-Infinity;
+    cells.forEach(k2=>{ const [r,c]=k2.split('-').map(Number); minR=Math.min(minR,r); maxR=Math.max(maxR,r); minC=Math.min(minC,c); maxC=Math.max(maxC,c); });
+    const anchorKey = `${minR}-${minC}`;
+    const group = { cells, minR, maxR, minC, maxC, anchorKey };
+    cells.forEach(k2=> groupOf[k2] = group);
+  });
+
+  const units = [];
+  const renderedGroups = new Set();
+
+  for(let r=0;r<maxRows;r++){
+    const isBlank = r < padTop;
+    const rowIdx = r - padTop;
+    for(let c=0;c<w.numCols;c++){
+      if(isBlank){
+        units.push({ gr:r, gc:c, spanRows:1, spanCols:1, kind:'blank' });
+        continue;
+      }
+      const key = rowIdx + '-' + c;
+      const group = groupOf[key];
+      if(group){
+        if(renderedGroups.has(group.anchorKey)) continue;
+        renderedGroups.add(group.anchorKey);
+        const anchorOverride = overrides[group.anchorKey];
+        units.push({
+          gr: group.minR + padTop, gc: group.minC,
+          spanRows: group.maxR - group.minR + 1,
+          spanCols: group.maxC - group.minC + 1,
+          kind: (anchorOverride && anchorOverride.type === 'image') ? 'image' : 'color',
+          data: anchorOverride,
+          keys: group.cells,
+          highlighted: true
+        });
+        continue;
+      }
+      const plain = overrides[key];
+      if(plain && plain.type === 'image'){
+        units.push({ gr:r, gc:c, spanRows:1, spanCols:1, kind:'image', data:plain, keys:[key], highlighted:false });
+      } else {
+        const tile = w.rowTiles[rowIdx];
+        if(tile){
+          units.push({ gr:r, gc:c, spanRows:1, spanCols:1, kind:'tile', data:tile, keys:[key], highlighted:false });
+        } else {
+          units.push({ gr:r, gc:c, spanRows:1, spanCols:1, kind:'empty', keys:[key], highlighted:false });
+        }
+      }
+    }
+  }
+  return { units, maxRows, numCols:w.numCols, padTop };
+}
+
+function handleUnitClick(wallIndex, unit){
+  if(highlighterMode){
+    toggleHighlighterKeys(wallIndex, unit.keys);
+  } else {
+    triggerKeysUpload(wallIndex, unit.keys, unit.highlighted);
+  }
+}
+
+function triggerKeysUpload(wallIndex, keys, highlighted){
+  activeUpload = { type:'cellKeys', wallIndex, keys, highlighted };
+  document.getElementById('fileInput').click();
+}
+
+function toggleHighlighterKeys(wallIndex, keys){
+  const w = walls[wallIndex];
+  if(!w.cellOverrides) w.cellOverrides = {};
+  const allMatch = keys.every(k=>{
+    const o = w.cellOverrides[k];
+    return o && o.type === 'color' && o.highlighted && o.color.toLowerCase() === highlighterColor.toLowerCase();
+  });
+  if(allMatch){
+    keys.forEach(k=> delete w.cellOverrides[k]);
+  } else {
+    keys.forEach(k=> w.cellOverrides[k] = { type:'color', color: highlighterColor, highlighted:true });
+  }
+  renderRoom();
+}
+
+function clearWallOverrides(wallIndex){
+  walls[wallIndex].cellOverrides = {};
+  renderRoom();
+}
+
+function renderHighlighterSwatches(){
+  const wrap = document.getElementById('highlighterSwatches');
+  wrap.innerHTML = '';
+  highlighterPalette.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'swatch' + (c.toLowerCase()===highlighterColor.toLowerCase() ? ' active':'');
+    el.style.background = c;
+    el.onclick = ()=> setHighlighterColor(c);
+    wrap.appendChild(el);
+  });
+}
+
+function setHighlighterColor(c){
+  highlighterColor = c;
+  document.getElementById('highlighterColorPicker').value = c;
+  renderHighlighterSwatches();
+}
+
+function toggleHighlighterMode(){
+  highlighterMode = !highlighterMode;
+  const btn = document.getElementById('highlighterToggle');
+  btn.textContent = 'Highlighter mode: ' + (highlighterMode ? 'On — click a tile to mark it' : 'Off');
+  btn.classList.toggle('active', highlighterMode);
+}
+
+function copyActiveWallToAll(){
+  const src = walls[activeWallIndex];
+  walls.forEach((w,i)=>{
+    if(i === activeWallIndex) return;
+    w.numRows = src.numRows;
+    w.numCols = src.numCols;
+    w.rowTiles = src.rowTiles.map(t=> t ? {...t} : null);
+    w.cellOverrides = {};
+    Object.keys(src.cellOverrides || {}).forEach(k=>{ w.cellOverrides[k] = {...src.cellOverrides[k]}; });
+  });
+  renderRoom();
+}
+
+function renderWallSwatches(){
+  const wrap = document.getElementById('wallSwatches');
+  wrap.innerHTML = '';
+  wallPalette.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'swatch' + (c.toLowerCase()===wallColor.toLowerCase() ? ' active':'');
+    el.style.background = c;
+    el.title = c;
+    el.onclick = ()=> setWallColor(c);
+    wrap.appendChild(el);
+  });
+}
+
+function setWallColor(c){
+  wallColor = c;
+  document.getElementById('wallColorPicker').value = c;
+  applyWallColorBg();
+  renderWallSwatches();
+  renderRoom();
+}
+
+function applyWallColorBg(){
+  document.getElementById('captureArea').style.background = wallColor;
+}
+
+function renderRatioOptions(){
+  const wrap = document.getElementById('ratioOptions');
+  wrap.innerHTML = '';
+  ratioOptions.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className = 'ratio-btn' + (tileRatio===opt.value ? ' active':'');
+    btn.textContent = opt.label;
+    btn.onclick = ()=>{ tileRatio = opt.value; renderRatioOptions(); renderRoom(); };
+    wrap.appendChild(btn);
+  });
+}
+
+function renderFitOptions(){
+  const wrap = document.getElementById('fitOptions');
+  wrap.innerHTML = '';
+  fitOptions.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className = 'ratio-btn' + (fitMode===opt.value ? ' active':'');
+    btn.textContent = opt.label;
+    btn.onclick = ()=>{ fitMode = opt.value; renderFitOptions(); renderRoom(); };
+    wrap.appendChild(btn);
+  });
+  const active = fitOptions.find(o=>o.value===fitMode);
+  document.getElementById('fitHint').textContent = active ? active.hint : '';
+}
+
+function renderGroutSwatches(){
+  const wrap = document.getElementById('groutSwatches');
+  wrap.innerHTML = '';
+  groutPalette.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'swatch' + (c.toLowerCase()===groutColor.toLowerCase()?' active':'');
+    el.style.background = c;
+    el.onclick = ()=> setGroutColor(c);
+    wrap.appendChild(el);
+  });
+}
+
+function setGroutColor(c){
+  groutColor = c;
+  document.getElementById('groutColorPicker').value = c;
+  renderGroutSwatches();
+  renderRoom();
+}
+
+function setGroutWidth(v){
+  groutWidth = parseInt(v);
+  document.getElementById('groutValLabel').textContent = groutWidth + 'px';
+  renderRoom();
+}
+
+function renderFloorGroutSwatches(){
+  const wrap = document.getElementById('floorGroutSwatches');
+  wrap.innerHTML = '';
+  groutPalette.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'swatch' + (c.toLowerCase()===floorGroutColor.toLowerCase()?' active':'');
+    el.style.background = c;
+    el.onclick = ()=> setFloorGroutColor(c);
+    wrap.appendChild(el);
+  });
+}
+
+function setFloorGroutColor(c){
+  floorGroutColor = c;
+  document.getElementById('floorGroutColorPicker').value = c;
+  renderFloorGroutSwatches();
+  renderRoom();
+}
+
+function setFloorGroutWidth(v){
+  floorGroutWidth = parseInt(v);
+  document.getElementById('floorGroutValLabel').textContent = floorGroutWidth + 'px';
+  renderRoom();
+}
+
+function changeRows(delta){
+  const w = walls[activeWallIndex];
+  const next = Math.min(10, Math.max(1, w.numRows+delta));
+  if(next === w.numRows) return;
+  if(next > w.numRows){
+    while(w.rowTiles.length < next) w.rowTiles.push(null);
+  } else {
+    w.rowTiles = w.rowTiles.slice(0, next);
+  }
+  w.numRows = next;
+  renderSidebarWallControls();
+  renderRoom();
+}
+
+function changeCols(delta){
+  const w = walls[activeWallIndex];
+  w.numCols = Math.min(14, Math.max(1, w.numCols+delta));
+  renderSidebarWallControls();
+  renderRoom();
+}
+
+function renderSidebarWallControls(){
+  const def = WALL_DEFS[activeWallIndex];
+  const w = walls[activeWallIndex];
+  document.getElementById('gridSizeWallLabel').textContent = `— ${def.name} (${def.tag})`;
+  document.getElementById('rowTilesWallLabel').textContent = `— ${def.name} (${def.tag})`;
+  document.getElementById('rowsVal').textContent = w.numRows;
+  document.getElementById('colsVal').textContent = w.numCols;
+  renderRowList();
+}
+
+function renderAll(){
+  renderSidebarWallControls();
+  renderRoom();
+}
+
+function renderRowList(){
+  const w = walls[activeWallIndex];
+  const list = document.getElementById('rowList');
+  list.innerHTML = '';
+  for(let i=0;i<w.numRows;i++){
+    const tile = w.rowTiles[i];
+    const item = document.createElement('div');
+    item.className = 'row-item';
+
+    const tag = document.createElement('div');
+    tag.className = 'row-tag';
+    tag.textContent = i+1;
+
+    const thumb = document.createElement('div');
+    thumb.className = 'row-thumb';
+    if(tile) thumb.style.backgroundImage = `url(${tile.url})`;
+    thumb.onclick = ()=> triggerUpload(activeWallIndex, i);
+
+    const info = document.createElement('div');
+    info.className = 'row-info';
+    info.innerHTML = `<div class="row-name">${tile ? tile.name : 'No tile yet'}</div>
+                       <div class="row-hint">Row ${i+1} · click to ${tile?'replace':'upload'}</div>`;
+
+    const actions = document.createElement('div');
+    actions.className = 'row-actions';
+    if(tile){
+      const clearBtn = document.createElement('button');
+      clearBtn.className = 'icon-btn';
+      clearBtn.textContent = '×';
+      clearBtn.title = 'Remove tile';
+      clearBtn.onclick = (e)=>{ e.stopPropagation(); w.rowTiles[i]=null; renderRowList(); renderRoom(); };
+      actions.appendChild(clearBtn);
+    }
+
+    item.appendChild(tag);
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(actions);
+    list.appendChild(item);
+  }
+}
+
+/* ---------- Floor ---------- */
+function renderFloorControls(){
+  const wrap = document.getElementById('floorRow');
+  wrap.innerHTML = '';
+  const item = document.createElement('div');
+  item.className = 'row-item';
+
+  const tag = document.createElement('div');
+  tag.className = 'row-tag';
+  tag.textContent = '⬚';
+  tag.style.fontSize = '11px';
+
+  const thumb = document.createElement('div');
+  thumb.className = 'row-thumb';
+  if(floor.tile) thumb.style.backgroundImage = `url(${floor.tile.url})`;
+  thumb.onclick = ()=> triggerFloorUpload();
+
+  const info = document.createElement('div');
+  info.className = 'row-info';
+  info.innerHTML = `<div class="row-name">${floor.tile ? floor.tile.name : 'No floor tile yet'}</div>
+                     <div class="row-hint">Click to ${floor.tile ? 'replace':'upload'}</div>`;
+
+  const actions = document.createElement('div');
+  actions.className = 'row-actions';
+  if(floor.tile){
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'icon-btn';
+    clearBtn.textContent = '×';
+    clearBtn.title = 'Remove floor tile';
+    clearBtn.onclick = (e)=>{ e.stopPropagation(); floor.tile=null; renderFloorControls(); renderRoom(); };
+    actions.appendChild(clearBtn);
+  }
+
+  item.appendChild(tag);
+  item.appendChild(thumb);
+  item.appendChild(info);
+  item.appendChild(actions);
+  wrap.appendChild(item);
+}
+
+function triggerFloorUpload(){
+  activeUpload = { type:'floor' };
+  document.getElementById('fileInput').click();
+}
+
+function wallFootprintPx(){
+  function wPx(idx){
+    const w = walls[idx];
+    const cw = Math.round(BASE_CELL * tileRatio);
+    return w.numCols*cw + (w.numCols-1)*groutWidth;
+  }
+  const frontW = wPx(0), rightW = wPx(1), backW = wPx(2), leftW = wPx(3);
+  return { roomWidthPx: Math.max(frontW, backW), roomDepthPx: Math.max(leftW, rightW) };
+}
+
+function computeFloorGrid(){
+  const { roomWidthPx, roomDepthPx } = wallFootprintPx();
+  const floorCellW = Math.round(BASE_CELL * floorRatio);
+  const floorCellH = BASE_CELL;
+  const cols = Math.max(1, Math.round(roomWidthPx / floorCellW));
+  const rows = Math.max(1, Math.round(roomDepthPx / floorCellH));
+  return { rows, cols };
+}
+
+function updateFloorGridInfo(){
+  const { rows, cols } = computeFloorGrid();
+  document.getElementById('floorGridInfo').textContent =
+    `Auto-fits the room footprint — currently about ${cols} × ${rows} floor tiles, based on your wall sizes and the tile shape below.`;
+}
+
+function renderFloorRatioOptions(){
+  const wrap = document.getElementById('floorRatioOptions');
+  wrap.innerHTML = '';
+  ratioOptions.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className = 'ratio-btn' + (floorRatio===opt.value ? ' active':'');
+    btn.textContent = opt.label;
+    btn.onclick = ()=>{ floorRatio = opt.value; renderFloorRatioOptions(); renderRoom(); };
+    wrap.appendChild(btn);
+  });
+}
+
+function getMaxRows(){
+  return Math.max(...walls.map(w=>w.numRows));
+}
+
+function buildWallFrame(wallIndex){
+  const w = walls[wallIndex];
+  const cellHeight = BASE_CELL;
+  const cellWidth = Math.round(BASE_CELL * tileRatio);
+  const plan = computeWallRenderPlan(wallIndex);
+
+  const frame = document.createElement('div');
+  frame.className = 'wall-frame';
+  frame.style.gridTemplateRows = `repeat(${plan.maxRows}, ${cellHeight}px)`;
+  frame.style.gridTemplateColumns = `repeat(${plan.numCols}, ${cellWidth}px)`;
+  frame.style.gap = groutWidth + 'px';
+  frame.style.background = groutColor;
+
+  plan.units.forEach(u=>{
+    const cell = document.createElement('div');
+    cell.style.gridRow = `${u.gr+1} / span ${u.spanRows}`;
+    cell.style.gridColumn = `${u.gc+1} / span ${u.spanCols}`;
+
+    if(u.kind === 'blank'){
+      cell.className = 'cell blank-wall';
+      cell.style.backgroundColor = wallColor;
+    } else if(u.kind === 'color'){
+      cell.className = 'cell highlighted';
+      cell.style.backgroundImage = 'none';
+      cell.style.backgroundColor = u.data.color;
+      cell.onclick = ()=> handleUnitClick(wallIndex, u);
+    } else if(u.kind === 'image' || u.kind === 'tile'){
+      cell.className = 'cell';
+      cell.style.backgroundImage = `url(${u.data.url})`;
+      cell.style.backgroundSize = (fitMode === 'stretch') ? '100% 100%' : 'contain';
+      cell.onclick = ()=> handleUnitClick(wallIndex, u);
+    } else {
+      cell.className = 'cell empty';
+      cell.onclick = ()=> handleUnitClick(wallIndex, u);
+    }
+    frame.appendChild(cell);
+  });
+  return frame;
+}
+
+function renderRoom(){
+  const maxRows = getMaxRows();
+  WALL_DEFS.forEach((def, i)=>{
+    const w = walls[i];
+    const slot = document.getElementById(def.slot);
+    slot.innerHTML = '';
+
+    const frame = buildWallFrame(i);
+    const trim = document.createElement('div');
+    trim.className = 'trim-line';
+    const skirt = document.createElement('div');
+    skirt.className = 'skirting';
+    const plaque = document.createElement('div');
+    plaque.className = 'wall-plaque';
+    plaque.textContent = `${def.tag} · ${w.numCols}×${w.numRows}`;
+
+    slot.appendChild(frame);
+    slot.appendChild(trim);
+    slot.appendChild(skirt);
+    slot.appendChild(plaque);
+  });
+
+  document.getElementById('metaLine').textContent =
+    `4 walls · rows matched to ${maxRows} (tallest wall)`;
+
+  updateFloorGridInfo();
+
+  const floorSlot = document.getElementById('floorSlotPreview');
+  if(floor.tile){
+    floorSlot.style.backgroundImage = `url(${floor.tile.url})`;
+    floorSlot.style.backgroundSize = 'cover';
+    floorSlot.textContent = '';
+  } else {
+    floorSlot.style.backgroundImage = 'none';
+    floorSlot.textContent = 'Floor';
+  }
+
+  rebuild3D();
+}
+
+/* ---------- Uploads ---------- */
+function triggerUpload(wallIndex, rowIndex){
+  activeUpload = { type:'wall', wallIndex, rowIndex };
+  document.getElementById('fileInput').click();
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file || !activeUpload) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    if(activeUpload.type === 'floor'){
+      floor.tile = { url: ev.target.result, name: file.name };
+      renderFloorControls();
+      renderRoom();
+    } else if(activeUpload.type === 'cellKeys'){
+      const {wallIndex, keys, highlighted} = activeUpload;
+      const w = walls[wallIndex];
+      if(!w.cellOverrides) w.cellOverrides = {};
+      keys.forEach(k=> w.cellOverrides[k] = { type:'image', url: ev.target.result, name: file.name, highlighted: !!highlighted });
+      renderRoom();
+    } else {
+      const {wallIndex, rowIndex} = activeUpload;
+      walls[wallIndex].rowTiles[rowIndex] = { url: ev.target.result, name: file.name };
+      if(wallIndex === activeWallIndex) renderRowList();
+      renderRoom();
+    }
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+
+function applyFirstToAll(){
+  const w = walls[activeWallIndex];
+  if(!w.rowTiles[0]){ triggerUpload(activeWallIndex, 0); return; }
+  for(let i=1;i<w.numRows;i++){ w.rowTiles[i] = { ...w.rowTiles[0] }; }
+  renderRowList();
+  renderRoom();
+}
+
+/* ---------- 3D Room ---------- */
+let three = {
+  renderer:null, scene:null, camera:null, roomGroup:null,
+  distance:9, azimuth:Math.PI/4, polar:Math.PI/3.2,
+  target:null, dragging:false, lastX:0, lastY:0, _distanceSet:false
+};
+let imgCache3D = {};
+
+function setup3D(){
+  const canvas = document.getElementById('threeCanvas');
+  three.renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+  three.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  three.scene = new THREE.Scene();
+  three.scene.background = new THREE.Color(0x14120e);
+  three.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+  three.roomGroup = new THREE.Group();
+  three.scene.add(three.roomGroup);
+  three.target = new THREE.Vector3(0, 1, 0);
+
+  three.scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const dir1 = new THREE.DirectionalLight(0xfff2dc, 0.9);
+  dir1.position.set(5, 10, 7);
+  three.scene.add(dir1);
+  const dir2 = new THREE.DirectionalLight(0xdce8ff, 0.25);
+  dir2.position.set(-6, 4, -5);
+  three.scene.add(dir2);
+
+  canvas.addEventListener('pointerdown', e=>{ three.dragging = true; three.lastX = e.clientX; three.lastY = e.clientY; canvas.setPointerCapture(e.pointerId); });
+  window.addEventListener('pointerup', ()=>{ three.dragging = false; });
+  window.addEventListener('pointercancel', ()=>{ three.dragging = false; });
+  window.addEventListener('pointermove', e=>{
+    if(!three.dragging) return;
+    const dx = e.clientX - three.lastX, dy = e.clientY - three.lastY;
+    three.lastX = e.clientX; three.lastY = e.clientY;
+    three.azimuth -= dx * 0.006;
+    three.polar = Math.min(Math.PI/2 - 0.05, Math.max(0.15, three.polar - dy * 0.006));
+  });
+  canvas.addEventListener('wheel', e=>{
+    e.preventDefault();
+    three.distance = Math.min(30, Math.max(3, three.distance + e.deltaY * 0.012));
+  }, {passive:false});
+
+  // pinch-to-zoom for touch devices
+  let pinchStartDist = null, pinchStartDistance = null;
+  function touchDist(touches){
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+  canvas.addEventListener('touchstart', e=>{
+    if(e.touches.length === 2){
+      three.dragging = false;
+      pinchStartDist = touchDist(e.touches);
+      pinchStartDistance = three.distance;
+    }
+  }, {passive:true});
+  canvas.addEventListener('touchmove', e=>{
+    if(e.touches.length === 2 && pinchStartDist){
+      e.preventDefault();
+      const d = touchDist(e.touches);
+      const ratio = pinchStartDist / d;
+      three.distance = Math.min(30, Math.max(3, pinchStartDistance * ratio));
+    }
+  }, {passive:false});
+  canvas.addEventListener('touchend', e=>{
+    if(e.touches.length < 2){ pinchStartDist = null; }
+  }, {passive:true});
+
+  window.addEventListener('resize', resize3D);
+  requestAnimationFrame(animate3D);
+}
+
+function resize3D(){
+  const wrap = document.getElementById('threeWrap');
+  if(getComputedStyle(wrap).display === 'none') return;
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if(w===0||h===0) return;
+  three.renderer.setSize(w, h, false);
+  three.camera.aspect = w/h;
+  three.camera.updateProjectionMatrix();
+}
+
+function animate3D(){
+  requestAnimationFrame(animate3D);
+  if(viewMode !== '3d' || !three.renderer) return;
+  const t = three.target;
+  const x = t.x + three.distance * Math.sin(three.polar) * Math.sin(three.azimuth);
+  const y = t.y + three.distance * Math.cos(three.polar);
+  const z = t.z + three.distance * Math.sin(three.polar) * Math.cos(three.azimuth);
+  three.camera.position.set(x, y, z);
+  three.camera.lookAt(t);
+  three.renderer.render(three.scene, three.camera);
+}
+
+function setViewMode(mode){
+  viewMode = mode;
+  document.getElementById('viewBtn2d').classList.toggle('active', mode==='2d');
+  document.getElementById('viewBtn3d').classList.toggle('active', mode==='3d');
+  document.getElementById('captureArea').style.display = mode==='2d' ? '' : 'none';
+  document.getElementById('threeWrap').style.display = mode==='3d' ? 'block' : 'none';
+  if(mode==='3d'){
+    requestAnimationFrame(()=>{ resize3D(); });
+  }
+}
+
+function generateWallCanvas(wallIndex){
+  const w = walls[wallIndex];
+  const plan = computeWallRenderPlan(wallIndex);
+  const cellH = BASE_CELL, cellW = Math.round(BASE_CELL * tileRatio);
+  const gridW = w.numCols * cellW + (w.numCols - 1) * groutWidth;
+  const gridH = plan.maxRows * cellH + (plan.maxRows - 1) * groutWidth;
+  const baseboardH = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = gridW;
+  canvas.height = gridH + baseboardH;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = groutColor;
+  ctx.fillRect(0, 0, gridW, gridH);
+
+  function boxPx(u){
+    return {
+      x: u.gc * (cellW + groutWidth),
+      y: u.gr * (cellH + groutWidth),
+      w: u.spanCols * cellW + (u.spanCols - 1) * groutWidth,
+      h: u.spanRows * cellH + (u.spanRows - 1) * groutWidth
+    };
+  }
+
+  plan.units.forEach(u=>{
+    const { x, y, w:boxW, h:boxH } = boxPx(u);
+    if(u.kind === 'blank'){
+      ctx.fillStyle = wallColor;
+      ctx.fillRect(x, y, boxW, boxH);
+    } else if(u.kind === 'color'){
+      ctx.fillStyle = u.data.color;
+      ctx.fillRect(x, y, boxW, boxH);
+    } else if(u.kind === 'image' || u.kind === 'tile'){
+      const im = imgCache3D[u.data.url];
+      if(im){
+        ctx.fillStyle = '#f4f0e6';
+        ctx.fillRect(x, y, boxW, boxH);
+        if(fitMode === 'stretch'){
+          ctx.drawImage(im, x, y, boxW, boxH);
+        } else {
+          const s = Math.min(boxW/im.width, boxH/im.height);
+          const dw = im.width*s, dh = im.height*s;
+          ctx.drawImage(im, x+(boxW-dw)/2, y+(boxH-dh)/2, dw, dh);
+        }
+      } else {
+        ctx.fillStyle = wallColor;
+        ctx.fillRect(x, y, boxW, boxH);
+      }
+    } else {
+      // no tile uploaded yet — show as plain wall colour, not a placeholder pattern
+      ctx.fillStyle = wallColor;
+      ctx.fillRect(x, y, boxW, boxH);
+    }
+  });
+
+  const grad = ctx.createLinearGradient(0, gridH, 0, gridH+baseboardH);
+  grad.addColorStop(0, '#8a6a45'); grad.addColorStop(1, '#5f4429');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, gridH, gridW, baseboardH);
+  return canvas;
+}
+
+function generateFloorCanvas(){
+  const { rows, cols } = computeFloorGrid();
+  const cellH = BASE_CELL;
+  const cellW = Math.round(BASE_CELL * floorRatio);
+  const gridW = cols*cellW + (cols-1)*floorGroutWidth;
+  const gridH = rows*cellH + (rows-1)*floorGroutWidth;
+  const canvas = document.createElement('canvas');
+  canvas.width = gridW; canvas.height = gridH;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = floorGroutColor;
+  ctx.fillRect(0, 0, gridW, gridH);
+
+  let cy = 0;
+  for(let r=0;r<rows;r++){
+    let cx = 0;
+    for(let c=0;c<cols;c++){
+      const im = floor.tile ? imgCache3D[floor.tile.url] : null;
+      if(im){
+        ctx.fillStyle = '#f4f0e6';
+        ctx.fillRect(cx, cy, cellW, cellH);
+        if(fitMode === 'stretch'){
+          ctx.drawImage(im, cx, cy, cellW, cellH);
+        } else {
+          const s = Math.min(cellW/im.width, cellH/im.height);
+          const dw = im.width*s, dh = im.height*s;
+          ctx.drawImage(im, cx+(cellW-dw)/2, cy+(cellH-dh)/2, dw, dh);
+        }
+      } else {
+        ctx.fillStyle = wallColor;
+        ctx.fillRect(cx, cy, cellW, cellH);
+      }
+      cx += cellW + floorGroutWidth;
+    }
+    cy += cellH + floorGroutWidth;
+  }
+  return canvas;
+}
+
+async function rebuild3D(){
+  if(!three.scene) return;
+
+  const urls = new Set();
+  walls.forEach(w=>{
+    w.rowTiles.forEach(t=>{ if(t) urls.add(t.url); });
+    Object.values(w.cellOverrides || {}).forEach(o=>{ if(o.type === 'image') urls.add(o.url); });
+  });
+  if(floor.tile) urls.add(floor.tile.url);
+  const toLoad = [...urls].filter(u=> !(u in imgCache3D));
+  if(toLoad.length){
+    await Promise.all(toLoad.map(u=> new Promise(res=>{
+      const im = new Image();
+      im.onload = ()=>{ imgCache3D[u] = im; res(); };
+      im.onerror = ()=>{ imgCache3D[u] = null; res(); };
+      im.src = u;
+    })));
+  }
+
+  while(three.roomGroup.children.length){
+    const obj = three.roomGroup.children.pop();
+    if(obj.geometry) obj.geometry.dispose();
+    if(obj.material){
+      if(obj.material.map) obj.material.map.dispose();
+      obj.material.dispose();
+    }
+  }
+
+  const UNIT = 1 / BASE_CELL;
+  const maxRows = getMaxRows();
+  const roomHeight = (maxRows*BASE_CELL + (maxRows-1)*groutWidth) * UNIT;
+
+  function wallWidthUnits(wallIndex){
+    const w = walls[wallIndex];
+    const cellW = Math.round(BASE_CELL * tileRatio);
+    return (w.numCols*cellW + (w.numCols-1)*groutWidth) * UNIT;
+  }
+
+  const frontW = wallWidthUnits(0), rightW = wallWidthUnits(1), backW = wallWidthUnits(2), leftW = wallWidthUnits(3);
+  const roomWidth = Math.max(frontW, backW);
+  const roomDepth = Math.max(leftW, rightW);
+
+  function makeWallMesh(wallIndex){
+    const canvas = generateWallCanvas(wallIndex);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    const wUnits = wallWidthUnits(wallIndex);
+    const geo = new THREE.PlaneGeometry(wUnits, roomHeight);
+    const mat = new THREE.MeshStandardMaterial({map:tex, side:THREE.DoubleSide, roughness:0.85});
+    return new THREE.Mesh(geo, mat);
+  }
+
+  const backMesh = makeWallMesh(2);
+  backMesh.position.set(0, roomHeight/2, -roomDepth/2);
+  three.roomGroup.add(backMesh);
+
+  const frontMesh = makeWallMesh(0);
+  frontMesh.position.set(0, roomHeight/2, roomDepth/2);
+  frontMesh.rotation.y = Math.PI;
+  three.roomGroup.add(frontMesh);
+
+  const leftMesh = makeWallMesh(3);
+  leftMesh.rotation.y = Math.PI/2;
+  leftMesh.position.set(-roomWidth/2, roomHeight/2, 0);
+  three.roomGroup.add(leftMesh);
+
+  const rightMesh = makeWallMesh(1);
+  rightMesh.rotation.y = -Math.PI/2;
+  rightMesh.position.set(roomWidth/2, roomHeight/2, 0);
+  three.roomGroup.add(rightMesh);
+
+  const floorCanvas = generateFloorCanvas();
+  const floorTex = new THREE.CanvasTexture(floorCanvas);
+  floorTex.needsUpdate = true;
+  const floorGeo = new THREE.PlaneGeometry(roomWidth, roomDepth);
+  const floorMat = new THREE.MeshStandardMaterial({map:floorTex, side:THREE.DoubleSide, roughness:0.9});
+  const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+  floorMesh.rotation.x = -Math.PI/2;
+  three.roomGroup.add(floorMesh);
+
+  three.target.set(0, roomHeight*0.4, 0);
+  if(!three._distanceSet){
+    three.distance = Math.max(roomWidth, roomDepth, roomHeight) * 1.6 + 2;
+    three._distanceSet = true;
+  }
+}
+
+/* ---------- Export ---------- */
+async function downloadImage(){
+  const btn = document.getElementById('downloadBtn');
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Preparing image…';
+  btn.disabled = true;
+  try{
+    const cellHeight = BASE_CELL;
+    const cellWidth = Math.round(BASE_CELL * tileRatio);
+    const scale = 3;
+    const maxRows = getMaxRows();
+    const gridHCommon = maxRows * cellHeight + (maxRows - 1) * groutWidth;
+    const trimH = 3, skirtH = 22, plaqueGap = 8, plaqueH = 14;
+    const blockH = gridHCommon + trimH + skirtH + plaqueGap + plaqueH;
+
+    const byKey = {};
+    WALL_DEFS.forEach((def,i)=>{ byKey[def.key] = {def, wall: walls[i]}; });
+    function blockW(key){
+      const w = byKey[key].wall;
+      return w.numCols * cellWidth + (w.numCols - 1) * groutWidth;
+    }
+    const frontW = blockW('front'), backW = blockW('back'), leftW = blockW('left'), rightW = blockW('right');
+    const floorSize = 90;
+
+    const colGap = 44, rowGap = 44, outerPad = 50;
+    const centerColW = Math.max(frontW, backW, floorSize);
+
+    const totalW = outerPad*2 + leftW + colGap + centerColW + colGap + rightW;
+    const totalH = outerPad*2 + blockH*3 + rowGap*2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(totalW * scale));
+    canvas.height = Math.max(1, Math.round(totalH * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = wallColor;
+    ctx.fillRect(0, 0, totalW, totalH);
+    const sheen = ctx.createLinearGradient(0, 0, 0, totalH);
+    sheen.addColorStop(0, 'rgba(255,255,255,0.20)');
+    sheen.addColorStop(0.75, 'rgba(0,0,0,0.04)');
+    sheen.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    // preload all images across all walls
+    const imgCache = {};
+    const loadPromises = [];
+    walls.forEach(w=>{
+      w.rowTiles.forEach(tile=>{
+        if(tile && !(tile.url in imgCache)){
+          imgCache[tile.url] = null;
+          loadPromises.push(new Promise(resolve=>{
+            const im = new Image();
+            im.onload = ()=>{ imgCache[tile.url] = im; resolve(); };
+            im.onerror = ()=> resolve();
+            im.src = tile.url;
+          }));
+        }
+      });
+      Object.values(w.cellOverrides || {}).forEach(o=>{
+        if(o.type === 'image' && !(o.url in imgCache)){
+          imgCache[o.url] = null;
+          loadPromises.push(new Promise(resolve=>{
+            const im = new Image();
+            im.onload = ()=>{ imgCache[o.url] = im; resolve(); };
+            im.onerror = ()=> resolve();
+            im.src = o.url;
+          }));
+        }
+      });
+    });
+    await Promise.all(loadPromises);
+
+    function drawWallBlock(wall, tag, x, y){
+      const gridW = wall.numCols * cellWidth + (wall.numCols - 1) * groutWidth;
+      const wallIndex = walls.indexOf(wall);
+      const plan = computeWallRenderPlan(wallIndex);
+
+      ctx.fillStyle = groutColor;
+      ctx.fillRect(x, y, gridW, gridHCommon);
+
+      function boxPx(u){
+        return {
+          bx: x + u.gc * (cellWidth + groutWidth),
+          by: y + u.gr * (cellHeight + groutWidth),
+          bw: u.spanCols * cellWidth + (u.spanCols - 1) * groutWidth,
+          bh: u.spanRows * cellHeight + (u.spanRows - 1) * groutWidth
+        };
+      }
+
+      plan.units.forEach(u=>{
+        const { bx, by, bw, bh } = boxPx(u);
+        if(u.kind === 'blank'){
+          ctx.fillStyle = wallColor;
+          ctx.fillRect(bx, by, bw, bh);
+        } else if(u.kind === 'color'){
+          ctx.fillStyle = u.data.color;
+          ctx.fillRect(bx, by, bw, bh);
+        } else if(u.kind === 'image' || u.kind === 'tile'){
+          ctx.fillStyle = '#f4f0e6';
+          ctx.fillRect(bx, by, bw, bh);
+          const im = imgCache[u.data.url];
+          if(im){
+            if(fitMode === 'stretch'){
+              ctx.drawImage(im, bx, by, bw, bh);
+            } else {
+              const s = Math.min(bw/im.width, bh/im.height);
+              const dw = im.width*s, dh = im.height*s;
+              ctx.drawImage(im, bx+(bw-dw)/2, by+(bh-dh)/2, dw, dh);
+            }
+          } else {
+            drawEmptyPattern(bx, by, bw, bh);
+          }
+        } else {
+          drawEmptyPattern(bx, by, bw, bh);
+        }
+      });
+
+      function drawEmptyPattern(bx, by, bw, bh){
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(bx, by, bw, bh);
+        ctx.clip();
+        ctx.strokeStyle = '#e9e3d5';
+        ctx.lineWidth = 6;
+        for(let d=-bh; d<bw+bh; d+=12){
+          ctx.beginPath();
+          ctx.moveTo(bx+d, by);
+          ctx.lineTo(bx+d+bh, by+bh);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      const trimGrad = ctx.createLinearGradient(x, 0, x+gridW, 0);
+      trimGrad.addColorStop(0, '#b6893f');
+      trimGrad.addColorStop(0.45, '#e2c98a');
+      trimGrad.addColorStop(1, '#b6893f');
+      ctx.fillStyle = trimGrad;
+      ctx.fillRect(x, y+gridHCommon, gridW, trimH);
+
+      const skirtGrad = ctx.createLinearGradient(0, y+gridHCommon+trimH, 0, y+gridHCommon+trimH+skirtH);
+      skirtGrad.addColorStop(0, '#8a6a45');
+      skirtGrad.addColorStop(1, '#5f4429');
+      ctx.fillStyle = skirtGrad;
+      ctx.fillRect(x, y+gridHCommon+trimH, gridW, skirtH);
+
+      ctx.fillStyle = 'rgba(40,32,20,0.72)';
+      ctx.font = "600 11px Inter, sans-serif";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`${tag} · ${wall.numCols}×${wall.numRows}`, x+gridW/2, y+gridHCommon+trimH+skirtH+plaqueGap);
+    }
+
+    const xLeftCol = outerPad;
+    const xCenterCol = outerPad + leftW + colGap;
+    const xRightCol = outerPad + leftW + colGap + centerColW + colGap;
+    const yTopRow = outerPad;
+    const yMiddleRow = outerPad + blockH + rowGap;
+    const yBottomRow = outerPad + blockH*2 + rowGap*2;
+
+    drawWallBlock(byKey.back.wall,  'Back',  xCenterCol + (centerColW-backW)/2, yTopRow);
+    drawWallBlock(byKey.left.wall,  'Left',  xLeftCol, yMiddleRow);
+    drawWallBlock(byKey.right.wall, 'Right', xRightCol + (rightW - rightW), yMiddleRow);
+    drawWallBlock(byKey.front.wall, 'Front', xCenterCol + (centerColW-frontW)/2, yBottomRow);
+
+    // floor slot
+    const fx = xCenterCol + centerColW/2 - floorSize/2;
+    const fy = yMiddleRow + gridHCommon/2 - floorSize/2;
+    ctx.save();
+    ctx.setLineDash([4,4]);
+    ctx.strokeStyle = 'rgba(90,67,34,0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(fx, fy, floorSize, floorSize);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(90,67,34,0.6)';
+    ctx.font = "700 10px Inter, sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FLOOR', fx+floorSize/2, fy+floorSize/2);
+
+    const link = document.createElement('a');
+    link.download = 'tile-room-preview.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(err){
+    console.error('Download failed:', err);
+    alert("Sorry, the image couldn't be generated. Please try again.");
+  } finally {
+    btn.textContent = originalLabel;
+    btn.disabled = false;
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
